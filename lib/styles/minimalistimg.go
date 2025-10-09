@@ -1,35 +1,38 @@
 package styles
 
 import (
-	"fmt"
 	"image"
+	"image/draw"
 
-	"golang.org/x/image/font"
 	"github.com/fogleman/gg"
+	"golang.org/x/image/font"
 
 	"canvas/lib/utils"
 )
 
-func ModifyMinimalistImage(src *image.Image, font *font.Face, text string) (*image.Image, error) {
-	switch im := (*src).(type) {
+func ModifyMinimalistImage(src image.Image, font *font.Face, text string) (*gg.Context, error) {
+	switch im := src.(type) {
 	case *image.RGBA:
 		return modifyMinimalistRGBA(im, font, text), nil;
 	default:
-		return nil, fmt.Errorf("Image is not of type RGBA.");
+		image_res := image.Rect(0, 0, im.Bounds().Dx(), im.Bounds().Dy());
+		rgba_img := image.NewRGBA(image_res);
+		draw.Draw(rgba_img, image_res, im, image.Pt(0, 0), draw.Src);
+
+		return modifyMinimalistRGBA(rgba_img, font, text), nil;
 	}
 }
 
 // for use in images.
-func modifyMinimalistRGBA(src *image.RGBA, font *font.Face, text string) *image.Image {
+func modifyMinimalistRGBA(src *image.RGBA, font *font.Face, text string) *gg.Context {
 	width, height := src.Rect.Max.X, src.Rect.Max.Y;
 
 	average_luminosity, _ := utils.GetAverageBrightnessOfRGBA(src, width, height);
 	screenResolution := image.Rect(0, 0, width, height);
 
 	dc := composeMinimalistFrameRGBA(src, *font, text, screenResolution, average_luminosity);
-	dcImg := dc.Image();
 
-	return &dcImg;
+	return dc;
 }
 
 func composeMinimalistFrameRGBA(
@@ -41,7 +44,6 @@ func composeMinimalistFrameRGBA(
 ) *gg.Context {
 	screenWidth := resolution.Max.X;
 	screenHeight := resolution.Max.Y;
-
 	dc := gg.NewContextForImage(img);
 
 	var r, g, b int;
@@ -54,6 +56,7 @@ func composeMinimalistFrameRGBA(
 		g = 255;
 		b = 255;
 	}
+
 
 	dc.SetFontFace(font);
 

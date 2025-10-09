@@ -16,7 +16,7 @@ func ModifyClassicImage(text string, author string, src image.Image, gradient im
 	resized := image.NewRGBA(screenResolution);
 	g := gift.New(
 		gift.Resize(720, 0, gift.LanczosResampling), // fastest upscaling.
-		gift.Brightness(-20),
+		gift.Brightness(-30),
 	);
 	g.Draw(resized, src);
 

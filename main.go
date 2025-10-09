@@ -3,8 +3,6 @@ package main
 import (
 	// "image"
 	"encoding/json"
-	"fmt"
-	"image"
 	"io"
 	"net/http"
 
@@ -13,6 +11,7 @@ import (
 
 	"github.com/fogleman/gg"
 
+	"image/gif"
 	_ "image/png"
 )
 
@@ -26,40 +25,69 @@ var small_classicgif_font, _ = gg.LoadFontFace("./fonts/Mirador-BookItalic.ttf",
 var gifminimalist_font, _ = gg.LoadFontFace("./fonts/Lora-Italic.ttf", 25)
 
 
-func getImageFromURL(url string) (image.Image, error) {
-	resp, err := http.Get(url);
-	if err != nil {
-		return nil, err;
-	}
-	defer resp.Body.Close();
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status: %s", resp.Status);
-	}
-	img, _, err := image.Decode(resp.Body);
-	if err != nil {
-		return nil, err;
-	}
-
-	return img, nil;
+type QuoteMeta struct {
+	AvatarUrl string `json:"avatar_url"`
+	Author string `json:"author"`
+	Text string `json:"text"`
 }
-
-type Meta struct {
-	Url string `json:"avatar_url"`
+type ImageQuoteMeta struct {
+	AvatarUrl string `json:"avatar_url"`
+	ImageUrl string `json:"image_url"`
 	Author string `json:"author"`
 	Text string `json:"text"`
 }
 
-func sendClassicImage(w http.ResponseWriter, r *http.Request) {
+func sendFramedImageQuote(w http.ResponseWriter, r *http.Request) {
 	reqBody, _ := io.ReadAll(r.Body);
-	var meta Meta;
-
+	var meta QuoteMeta;
 
 	if err := json.Unmarshal(reqBody, &meta); err != nil {
 		http.Error(w, "Failed to parse metadata.", http.StatusBadRequest);
 		return;
 	}
-	img, err := getImageFromURL(meta.Url);
+	/*
+	img, err := GetImageFromUrl(meta.Url);
+	if err != nil {
+		http.Error(w, "Can't get image from URL. " + err.Error(), http.StatusBadRequest);
+		return;
+	}
+	*/
+}
+
+func sendMinimalistQuote(w http.ResponseWriter, r *http.Request) {
+	reqBody, _ := io.ReadAll(r.Body);
+	var meta QuoteMeta;
+
+	if err := json.Unmarshal(reqBody, &meta); err != nil {
+		http.Error(w, "Failed to parse metadata.", http.StatusBadRequest);
+		return;
+	}
+	img, err := utils.GetImageFromURL(meta.AvatarUrl);
+	if err != nil {
+		http.Error(w, "Can't get image from URL. " + err.Error(), http.StatusBadRequest);
+		return;
+	}
+	imgData, err := styles.ModifyMinimalistImage(img, &small_classic_font, meta.Text);
+	if err != nil {
+		http.Error(w, "minimalist image error: " + err.Error(), http.StatusBadRequest);
+		return;
+	}
+	w.Header().Set("Content-Type", "image/png");
+	imgData.EncodePNG(w);
+}
+
+
+// todo: combine classic quote and gif quote together.
+func sendClassicQuote(w http.ResponseWriter, r *http.Request) {
+	reqBody, _ := io.ReadAll(r.Body);
+	var meta QuoteMeta;
+
+	if err := json.Unmarshal(reqBody, &meta); err != nil {
+		http.Error(w, "Failed to parse metadata.", http.StatusBadRequest);
+		return;
+	}
+	img, err := utils.GetImageFromURL(meta.AvatarUrl);
 	if err != nil {
 		http.Error(w, "Can't get image from URL. " + err.Error(), http.StatusBadRequest);
 		return;
@@ -69,13 +97,38 @@ func sendClassicImage(w http.ResponseWriter, r *http.Request) {
 	imgData.EncodePNG(w);
 }
 
+func sendClassicGifQuote(w http.ResponseWriter, r *http.Request) {
+	reqBody, _ := io.ReadAll(r.Body);
+	var meta QuoteMeta;
+
+	if err := json.Unmarshal(reqBody, &meta); err != nil {
+		http.Error(w, "Failed to parse metadata.", http.StatusBadRequest);
+		return;
+	}
+
+	// get gif instead.
+	decoded_gif, err := utils.GetGifFromURL(meta.AvatarUrl);
+	if err != nil {
+		http.Error(w, "Can't get image from URL. " + err.Error(), http.StatusBadRequest);
+		return;
+	}
+
+	gifData := styles.ModifyClassicGif(decoded_gif, &big_classic_font, &small_classic_font, meta.Text, meta.Author, &gradient);
+	w.Header().Set("Content-Type", "image/gif");
+	gif.EncodeAll(w, gifData);
+}
+
+
 func ping(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Pong!"));
 }
 
 func main() {
 	http.HandleFunc("/ping", ping);
-	http.HandleFunc("/quote", sendClassicImage);
-	http.ListenAndServe(":8080", nil);
+	http.HandleFunc("/quote", sendClassicQuote);
+	http.HandleFunc("/quotegif", sendClassicGifQuote);
+	http.HandleFunc("/quotemini", sendMinimalistQuote);
+	http.HandleFunc("/quoteframe", sendFramedImageQuote);
 	println("Started server on localhost:8080");
+	http.ListenAndServe(":8080", nil);
 }

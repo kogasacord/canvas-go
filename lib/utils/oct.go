@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"image/gif"
 )
@@ -201,6 +202,31 @@ func (quantizer *OctreeQuantizer) GetPaletteIndex(color Color) int {
     return quantizer.Root.GetPaletteIndex(color, 0)
 }
 
+// very slow on tight loops, do not use this in animated gifs.
+func (quantizer *OctreeQuantizer) ConvertRGBAToPalettedImage(img *image.RGBA, palette color.Palette) image.PalettedImage  {
+	paletted_image := image.NewPaletted(img.Rect, palette);
+	bounds := img.Bounds();
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			i := y*img.Stride + x*4
+			r := img.Pix[i+0]
+			g := img.Pix[i+1]
+			b := img.Pix[i+2]
+			a := img.Pix[i+3]
+			if a == 0 {
+				continue;
+			}
+
+			color := NewColor(int(r), int(g), int(b), int(a));
+			index := quantizer.GetPaletteIndex(color);
+			paletted_image.SetColorIndex(x, y, uint8(index));
+		}
+	}
+
+	return paletted_image;
+}
+
 func ConvertToColorPalette(palette []Color) color.Palette {
     var colorPalette color.Palette
     for _, c := range palette {
@@ -227,4 +253,5 @@ func AddColorsToQuantizer(q *OctreeQuantizer, g *gif.GIF) {
         }
     }
 }
+
 

@@ -2,22 +2,35 @@ package styles
 
 import (
 	"image"
+	"image/draw"
 	"image/gif"
+	"log"
+	"time"
 
-	"golang.org/x/image/font"
-	"github.com/disintegration/gift"
 	"canvas/lib/utils"
+
+	"github.com/disintegration/gift"
+	// "github.com/fogleman/gg"
+	"golang.org/x/image/font"
 )
 
-// text string, author string, src *image.Image, gradient *image.Image, font *font.Face, small_font *font.Face
-func ModifyClassicGif(src *gif.GIF, font *font.Face, small_font *font.Face, text string, author string, gradient *image.Image) *gif.GIF {
+func ModifyClassicGif(
+	src *gif.GIF, 
+	font *font.Face, 
+	small_font *font.Face, 
+	text string, 
+	author string, 
+	gradient *image.Image,
+) *gif.GIF {
+	start := time.Now();
+
 	newGif := &gif.GIF{};
 
-	width := int(float32(src.Config.Height) * 1.77778);
-	grad := image.NewRGBA(image.Rect(0, 0, width, src.Config.Height));
 	resizer := gift.New(gift.Resize(0, src.Config.Height, gift.LinearResampling))
-	resizer.Draw(grad, *gradient);
+	width := int(float32(src.Config.Height) * 1.77778);
 
+	// why not use the source gif's palette to save us the work?
+	// pre-quantize the overlay image to be in the source gif palette..?
     quantizer := utils.NewOctreeQuantizer()
 	utils.AddColorsToQuantizer(quantizer, src);
     colorCount := 256; // colors. 256 before.
@@ -25,8 +38,17 @@ func ModifyClassicGif(src *gif.GIF, font *font.Face, small_font *font.Face, text
 	colorPalette := utils.ConvertToColorPalette(palette);
 	screenResolution := image.Rect(0, 0, width, src.Config.Height);
 
-	// the reused image.
 	reusedImage := image.NewPaletted(screenResolution, colorPalette);
+
+	// an attempt to render the image 
+	gradient_assumed_size := image.Rect(0, 0, 1280, 720);
+	temp_empty_image := image.NewPaletted(gradient_assumed_size, colorPalette);
+	overlay_canvas := composeClassicImage(temp_empty_image, *gradient, *font, *small_font, gradient_assumed_size, text, author, 400, 9);
+	overlay_canvas.SavePNG("./testtest.png");
+
+	overlay_image := image.NewRGBA(screenResolution);
+	resizer.Draw(overlay_image, overlay_canvas.Image());
+	overlay_quant_image := quantizer.ConvertRGBAToPalettedImage(overlay_canvas.Image().(*image.RGBA), colorPalette);
 
 	for i := 0; i < len(src.Image); i++ {
 		img := src.Image[i];
@@ -35,18 +57,20 @@ func ModifyClassicGif(src *gif.GIF, font *font.Face, small_font *font.Face, text
 
 		regularImage := image.NewPaletted(screenResolution, colorPalette);
 
-		dc := composeClassicImage(img, grad, *font, *small_font, screenResolution, text, author, 400, 9);
-		dcImg := dc.Image().(*image.RGBA);
-		bounds := dcImg.Bounds();
+		main_img := image.NewRGBA(screenResolution);
+		// fast for blitting!
+		draw.Draw(main_img, screenResolution, img, image.Pt(0, 0), draw.Src);
+		draw.Draw(main_img, screenResolution, overlay_quant_image, image.Pt(0, 0), draw.Over);
+
+		bounds := main_img.Bounds();
 
 		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 			for x := bounds.Min.X; x < bounds.Max.X; x++ {
-				i := y*dcImg.Stride + x*4
-				// Extract the RGBA values directly from the Pix slice
-				r := dcImg.Pix[i+0]
-				g := dcImg.Pix[i+1]
-				b := dcImg.Pix[i+2]
-				a := dcImg.Pix[i+3]
+				i := y*main_img.Stride + x*4
+				r := main_img.Pix[i+0]
+				g := main_img.Pix[i+1]
+				b := main_img.Pix[i+2]
+				a := main_img.Pix[i+3]
 				if a == 0 {
 					continue;
 				}
@@ -63,14 +87,12 @@ func ModifyClassicGif(src *gif.GIF, font *font.Face, small_font *font.Face, text
 		}
 
 		if disposal == gif.DisposalNone {
-			copiedReusedImage := image.NewPaletted(screenResolution, colorPalette)
-			copy(copiedReusedImage.Pix, reusedImage.Pix)
-			newGif.Image = append(newGif.Image, copiedReusedImage);
+			newGif.Image = append(newGif.Image, reusedImage);
 		} else {
 			newGif.Image = append(newGif.Image, regularImage);
 		}
 		newGif.Delay = append(newGif.Delay, delay);
-		newGif.Disposal = append(newGif.Disposal, 1);
+		newGif.Disposal = append(newGif.Disposal, disposal);
 	}
 
 	newGif.LoopCount = src.LoopCount;
@@ -78,6 +100,9 @@ func ModifyClassicGif(src *gif.GIF, font *font.Face, small_font *font.Face, text
 	newGif.Config.Width = width;
 	newGif.Config.ColorModel = src.Config.ColorModel;
 	newGif.BackgroundIndex = src.BackgroundIndex;
+
+	elapsed := time.Since(start);
+	log.Printf("classicgif v1 took %s\n", elapsed);
 
 	return newGif;
 }
