@@ -21,7 +21,7 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif := &gif.GIF{};
 
     quantizer := utils.NewOctreeQuantizer()
-	utils.AddColorsToQuantizer(quantizer, src);
+	quantizer.AddColorsFromGIF(src);
     colorCount := 256; // colors. 256 before.
 	palette := quantizer.MakePalette(colorCount)
 	colorPalette := utils.ConvertToColorPalette(palette);

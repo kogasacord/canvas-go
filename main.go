@@ -3,8 +3,12 @@ package main
 import (
 	// "image"
 	"encoding/json"
+	"flag"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"runtime/pprof"
 
 	"canvas/lib/styles"
 	"canvas/lib/utils"
@@ -123,7 +127,39 @@ func ping(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Pong!"));
 }
 
+func testGIFCompose()  {
+	testGIF := utils.OpenGIF("./images/test.gif");
+	styles.ModifyClassicGif(
+		testGIF, 
+		&big_classic_font, 
+		&small_classic_font, 
+		"bless up", 
+		"- tempt", 
+		&gradient,
+	);
+}
+
+func profileCPU() {
+	testGIFCompose();
+}
+
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file");
 func main() {
+	flag.Parse();
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile);
+		if err != nil {
+			log.Fatal(err);
+		}
+		pprof.StartCPUProfile(f);
+		defer pprof.StopCPUProfile();
+
+		println("Profiling!");
+		profileCPU();
+
+		return;
+	}
+
 	http.HandleFunc("/ping", ping);
 	http.HandleFunc("/quote", sendClassicQuote);
 	http.HandleFunc("/quotegif", sendClassicGifQuote);

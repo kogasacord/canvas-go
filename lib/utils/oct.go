@@ -227,21 +227,8 @@ func (quantizer *OctreeQuantizer) ConvertRGBAToPalettedImage(img *image.RGBA, pa
 	return paletted_image;
 }
 
-func ConvertToColorPalette(palette []Color) color.Palette {
-    var colorPalette color.Palette
-    for _, c := range palette {
-        colorPalette = append(colorPalette, color.RGBA{
-            R: uint8(c.Red),
-            G: uint8(c.Green),
-            B: uint8(c.Blue),
-            A: uint8(c.Alpha),
-        })
-    }
-    return colorPalette
-}
-
-func AddColorsToQuantizer(q *OctreeQuantizer, g *gif.GIF) {
-    // Add colors from each frame to the quantizer
+// extremely inefficient.
+func (q *OctreeQuantizer) AddColorsFromGIF(g *gif.GIF) {
     for _, frame := range g.Image {
         bounds := frame.Bounds()
         for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
@@ -254,4 +241,35 @@ func AddColorsToQuantizer(q *OctreeQuantizer, g *gif.GIF) {
     }
 }
 
+func (q *OctreeQuantizer) AddColorsFromImage(img image.Image) {
+        bounds := img.Bounds();
+        for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+            for x := bounds.Min.X; x < bounds.Max.X; x++ {
+                r, g, b, a := img.At(x, y).RGBA()
+                color := NewColor(int(r>>8), int(g>>8), int(b>>8), int(a>>8))
+                q.AddColor(color) // called every pixel in every frame!
+            }
+        }
+}
+
+
+func (q *OctreeQuantizer) AddSelectedColors(palette []Color) {
+	for _, color := range palette {
+		q.AddColor(color);
+	}
+}
+
+
+func ConvertToColorPalette(palette []Color) color.Palette {
+    var colorPalette color.Palette
+    for _, c := range palette {
+        colorPalette = append(colorPalette, color.RGBA{
+            R: uint8(c.Red),
+            G: uint8(c.Green),
+            B: uint8(c.Blue),
+            A: uint8(c.Alpha),
+        })
+    }
+    return colorPalette
+}
 
