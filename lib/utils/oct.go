@@ -11,6 +11,48 @@ type Color struct {
     Red, Green, Blue, Alpha int
 }
 
+func (clr Color) Subtract(nextColor Color) Color {
+	return Color {
+		Red: clr.Red - nextColor.Red,
+		Green: clr.Green - nextColor.Green,
+		Blue: clr.Blue - nextColor.Blue,
+		Alpha: clr.Alpha - nextColor.Alpha,
+	}
+}
+func (clr *Color) AddMutate(nextColor Color) *Color {
+	clr.Red += nextColor.Red;
+	clr.Green += nextColor.Green;
+	clr.Blue += nextColor.Blue;
+	clr.Alpha += nextColor.Alpha;
+
+	return clr;
+}
+func (clr Color) Add(nextColor Color) Color {
+	return Color {
+		Red: clr.Red + nextColor.Red,
+		Green: clr.Green + nextColor.Green,
+		Blue: clr.Blue + nextColor.Blue,
+		Alpha: clr.Alpha + nextColor.Alpha,
+	}
+}
+func (clr Color) MultiplyByNum(num int) Color {
+	return Color {
+		Red: clr.Red * num,
+		Green: clr.Green * num,
+		Blue: clr.Blue * num,
+		Alpha: clr.Alpha * num,
+	}
+}
+func (clr Color) DivideByNum(num int) Color {
+	return Color {
+		Red: clr.Red / num,
+		Green: clr.Green / num,
+		Blue: clr.Blue / num,
+		Alpha: clr.Alpha / num,
+	}
+}
+
+
 type OctreeNode struct {
     Color        Color
     PixelCount   int
@@ -73,7 +115,7 @@ func (node *OctreeNode) AddColor(color Color, level int, parent *OctreeQuantizer
         node.Color.Red += color.Red
         node.Color.Green += color.Green
         node.Color.Blue += color.Blue
-        node.Color.Alpha += color.Alpha
+        // node.Color.Alpha += color.Alpha
         node.PixelCount++
         return
     }
@@ -108,7 +150,7 @@ func (node *OctreeNode) RemoveLeaves() int {
             node.Color.Red += node.Children[i].Color.Red
             node.Color.Green += node.Children[i].Color.Green
             node.Color.Blue += node.Children[i].Color.Blue
-            node.Color.Alpha += node.Children[i].Color.Alpha
+            // node.Color.Alpha += node.Children[i].Color.Alpha
             node.PixelCount += node.Children[i].PixelCount
             result++
         }
@@ -120,6 +162,7 @@ func (node *OctreeNode) RemoveLeaves() int {
 func (node *OctreeNode) GetColorIndexForLevel(color Color, level int) int {
     index := 0
     mask := 0x80 >> level
+
     if color.Red&mask != 0 {
         index |= 4
     }
@@ -140,7 +183,7 @@ func (node *OctreeNode) GetColor() Color {
         Red:   node.Color.Red / node.PixelCount,
         Green: node.Color.Green / node.PixelCount,
         Blue:  node.Color.Blue / node.PixelCount,
-        Alpha: node.Color.Alpha / node.PixelCount,
+        Alpha: 255,
     }
 }
 
@@ -259,6 +302,10 @@ func (q *OctreeQuantizer) AddSelectedColors(palette []Color) {
 	}
 }
 
+func ConvertToColor(color color.Color) Color {
+	r, g, b, a := color.RGBA();
+	return NewColor(int(r), int(g), int(b), int(a));
+}
 
 func ConvertToColorPalette(palette []Color) color.Palette {
     var colorPalette color.Palette

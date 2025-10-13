@@ -1,13 +1,11 @@
 package styles
 
 import (
-	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/gif"
-	"image/png"
 	"log"
-	"os"
 	"time"
 
 	"canvas/lib/utils"
@@ -29,13 +27,19 @@ func ModifyClassicGif(
 
 	newGif := &gif.GIF{};
 
-	resizer := gift.New(gift.Resize(0, src.Config.Height, gift.LinearResampling))
+	resizer := gift.New(gift.Resize(0, src.Config.Height, gift.LinearResampling));
 	width := int(float32(src.Config.Height) * 1.77778);
 	screenResolution := image.Rect(0, 0, width, src.Config.Height);
 
     gifQuantizer := utils.NewOctreeQuantizer();
 	gifQuantizer.AddColorsFromGIF(src); // COSTLY.
-	colorPalette := utils.ConvertToColorPalette(gifQuantizer.MakePalette(256));
+	colorPalette := utils.ConvertToColorPalette(gifQuantizer.MakePalette(255));
+
+	transparentColor := color.RGBA{0, 0, 0, 0};
+	colorPalette = append(colorPalette, transparentColor);
+	transparentIndex := len(colorPalette) - 1;
+	// put a transparent color palette in the palette
+	// transparentIndex gets pushed in the image when the alpha is below 255.
 
 	gradientAssumedSize := image.Rect(0, 0, 1280, 720);
 	tempEmptyImage := image.NewRGBA(gradientAssumedSize);
@@ -50,6 +54,7 @@ func ModifyClassicGif(
 		img := src.Image[i];
 		delay := src.Delay[i];
 		disposal := src.Disposal[i];
+		ditherBuffer := utils.NewDitherBuffer(screenResolution.Max.X, screenResolution.Max.Y);
 
 		regularImage := image.NewPaletted(screenResolution, colorPalette);
 
@@ -58,34 +63,33 @@ func ModifyClassicGif(
 		draw.Draw(mainImg, screenResolution, resizedOverlayImage, image.Pt(0, 0), draw.Over);
 		// alpha-blends correctly ^^
 
-		bounds := mainImg.Bounds();
-
-		// convert this into a function and make a dithering function for the gradient.
+		// ditherErrorBuffer := image.NewRGBA(screenResolution);
 		
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			for x := bounds.Min.X; x < bounds.Max.X; x++ {
-				i := y*mainImg.Stride + x*4
-				r := mainImg.Pix[i+0]
-				g := mainImg.Pix[i+1]
-				b := mainImg.Pix[i+2]
-				a := mainImg.Pix[i+3]
-				if a == 0 {
-					continue;
-				}
-				/*
-				if a < 200 {
-					fmt.Printf("x: %d, y: %d, (%d, %d, %d), a: %d\n", x, y, r, g, b, a);
-				}
-				*/
-
+		for y := screenResolution.Min.Y; y < screenResolution.Max.Y; y++ {
+			for x := screenResolution.Min.X; x < screenResolution.Max.X; x++ {
+				rgbaIndex := y*mainImg.Stride + x*4
+				errorIndex := (y-screenResolution.Min.Y)*screenResolution.Dx() + (x-screenResolution.Min.X)
+				r := mainImg.Pix[rgbaIndex+0]
+				g := mainImg.Pix[rgbaIndex+1]
+				b := mainImg.Pix[rgbaIndex+2]
+				a := mainImg.Pix[rgbaIndex+3]
 				color := utils.NewColor(int(r), int(g), int(b), int(a));
-				index := gifQuantizer.GetPaletteIndex(color);
-				if disposal == gif.DisposalPrevious {
-					i := reusedImage.PixOffset(x, y);
-					reusedImage.Pix[i] = uint8(index);
+
+				bufferError := ditherBuffer.GetErrorIndex(max(errorIndex - 1, 0));
+				appliedErrorColor := ditherBuffer.ApplyErrorToColor(bufferError, color);
+
+				var paletteIndex int
+				if a < 254 {
+					paletteIndex = transparentIndex;
 				} else {
-					regularImage.SetColorIndex(x, y, uint8(index));
+					paletteIndex = gifQuantizer.GetPaletteIndex(color);
 				}
+				palettedColor := utils.ConvertToColor(colorPalette[paletteIndex]);
+
+				ditherBuffer.DiffusePixelWithFloydSteinberg(x, y, appliedErrorColor, palettedColor);
+
+				reusedImage.SetColorIndex(x, y, uint8(paletteIndex));
+				regularImage.SetColorIndex(x, y, uint8(paletteIndex));
 			}
 		}
 
@@ -110,13 +114,3 @@ func ModifyClassicGif(
 	return newGif;
 }
 
-func encodeOverlayImage(img image.Image) {
-	f, err := os.Create("overlayimage.png")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	if err = png.Encode(f, img); err != nil {
-		log.Printf("failed to encode: %v", err)
-	}
-}
