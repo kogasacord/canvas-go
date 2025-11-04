@@ -63,7 +63,6 @@ func ModifyClassicGif(
 		draw.Draw(mainImg, screenResolution, resizedOverlayImage, image.Pt(0, 0), draw.Over);
 		// alpha-blends correctly ^^
 
-		// ditherErrorBuffer := image.NewRGBA(screenResolution);
 		
 		for y := screenResolution.Min.Y; y < screenResolution.Max.Y; y++ {
 			for x := screenResolution.Min.X; x < screenResolution.Max.X; x++ {
@@ -82,7 +81,7 @@ func ModifyClassicGif(
 				if a < 254 {
 					paletteIndex = transparentIndex;
 				} else {
-					paletteIndex = gifQuantizer.GetPaletteIndex(color);
+					paletteIndex = gifQuantizer.GetPaletteIndex(appliedErrorColor);
 				}
 				palettedColor := utils.ConvertToColor(colorPalette[paletteIndex]);
 
@@ -91,6 +90,10 @@ func ModifyClassicGif(
 				reusedImage.SetColorIndex(x, y, uint8(paletteIndex));
 				regularImage.SetColorIndex(x, y, uint8(paletteIndex));
 			}
+		}
+
+		if i == 0 {
+			ditherBuffer.DumpErrorBuffer("ditherbuffer.png");
 		}
 
 		if disposal == gif.DisposalPrevious {
