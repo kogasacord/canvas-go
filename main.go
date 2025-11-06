@@ -127,9 +127,9 @@ func ping(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Pong!"));
 }
 
-func testGIFCompose()  {
-	testGIF := utils.OpenGIF("./images/test.gif");
-	styles.ModifyClassicGif(
+func testGIFCompose() *gif.GIF {
+	testGIF := utils.OpenGIF("./images/sample-gifs/final-boss.gif");
+	resGIF := styles.ModifyClassicGif(
 		testGIF, 
 		&big_classic_font, 
 		&small_classic_font, 
@@ -137,6 +137,14 @@ func testGIFCompose()  {
 		"- tempt", 
 		&gradient,
 	);
+
+	return resGIF;
+}
+
+func sendTestGIFCompose(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/gif");
+	resGIF := testGIFCompose();
+	gif.EncodeAll(w, resGIF);
 }
 
 func profileCPU() {
@@ -163,6 +171,7 @@ func main() {
 	http.HandleFunc("/ping", ping);
 	http.HandleFunc("/quote", sendClassicQuote);
 	http.HandleFunc("/quotegif", sendClassicGifQuote);
+	http.HandleFunc("/quotegiftest", sendTestGIFCompose);
 	http.HandleFunc("/quotemini", sendMinimalistQuote);
 	http.HandleFunc("/quoteframe", sendFramedImageQuote);
 	println("Started server on localhost:8080");

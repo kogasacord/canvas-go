@@ -11,7 +11,6 @@ import (
 	"canvas/lib/utils"
 
 	"github.com/disintegration/gift"
-	// "github.com/fogleman/gg"
 	"golang.org/x/image/font"
 )
 
@@ -38,8 +37,6 @@ func ModifyClassicGif(
 	transparentColor := color.RGBA{0, 0, 0, 0};
 	colorPalette = append(colorPalette, transparentColor);
 	transparentIndex := len(colorPalette) - 1;
-	// put a transparent color palette in the palette
-	// transparentIndex gets pushed in the image when the alpha is below 255.
 
 	gradientAssumedSize := image.Rect(0, 0, 1280, 720);
 	tempEmptyImage := image.NewRGBA(gradientAssumedSize);
@@ -54,7 +51,6 @@ func ModifyClassicGif(
 		img := src.Image[i];
 		delay := src.Delay[i];
 		disposal := src.Disposal[i];
-		ditherBuffer := utils.NewDitherBuffer(screenResolution.Max.X, screenResolution.Max.Y);
 
 		regularImage := image.NewPaletted(screenResolution, colorPalette);
 
@@ -62,38 +58,26 @@ func ModifyClassicGif(
 		draw.Draw(mainImg, screenResolution, img, image.Pt(0, 0), draw.Src); // fast.
 		draw.Draw(mainImg, screenResolution, resizedOverlayImage, image.Pt(0, 0), draw.Over);
 		// alpha-blends correctly ^^
-
 		
 		for y := screenResolution.Min.Y; y < screenResolution.Max.Y; y++ {
 			for x := screenResolution.Min.X; x < screenResolution.Max.X; x++ {
 				rgbaIndex := y*mainImg.Stride + x*4
-				errorIndex := (y-screenResolution.Min.Y)*screenResolution.Dx() + (x-screenResolution.Min.X)
 				r := mainImg.Pix[rgbaIndex+0]
 				g := mainImg.Pix[rgbaIndex+1]
 				b := mainImg.Pix[rgbaIndex+2]
 				a := mainImg.Pix[rgbaIndex+3]
 				color := utils.NewColor(int(r), int(g), int(b), int(a));
 
-				bufferError := ditherBuffer.GetErrorIndex(max(errorIndex - 1, 0));
-				appliedErrorColor := ditherBuffer.ApplyErrorToColor(bufferError, color);
-
 				var paletteIndex int
 				if a < 254 {
 					paletteIndex = transparentIndex;
 				} else {
-					paletteIndex = gifQuantizer.GetPaletteIndex(appliedErrorColor);
+					paletteIndex = gifQuantizer.GetPaletteIndex(color);
 				}
-				palettedColor := utils.ConvertToColor(colorPalette[paletteIndex]);
-
-				ditherBuffer.DiffusePixelWithFloydSteinberg(x, y, appliedErrorColor, palettedColor);
 
 				reusedImage.SetColorIndex(x, y, uint8(paletteIndex));
 				regularImage.SetColorIndex(x, y, uint8(paletteIndex));
 			}
-		}
-
-		if i == 0 {
-			ditherBuffer.DumpErrorBuffer("ditherbuffer.png");
 		}
 
 		if disposal == gif.DisposalPrevious {
