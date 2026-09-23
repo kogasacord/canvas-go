@@ -12,5 +12,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o canvas-go .
 FROM scratch
 
 COPY --from=builder /app/canvas-go /canvas-go
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 ENTRYPOINT [ "/canvas-go" ]
