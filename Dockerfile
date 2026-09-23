@@ -13,5 +13,6 @@ FROM scratch
 
 COPY --from=builder /app/canvas-go /canvas-go
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /app/images/quote/qgradient.png /images/quote/qgradient.png
 
 ENTRYPOINT [ "/canvas-go" ]
